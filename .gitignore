@@ -1,0 +1,20 @@
+# 编译目录
+build/
+cmake-build-*/
+
+# 临时文件
+mx.scratch
+
+# 编译生成的文件
+*.elf
+*.hex
+*.bin
+*.map
+*.o
+*.d
+*.lst
+*.list
+*.su
+
+
+.settings/
