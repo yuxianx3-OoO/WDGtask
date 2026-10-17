@@ -165,7 +165,11 @@ int main(void)
     /* USER CODE END WHILE */
     
     /* USER CODE BEGIN 3 */
-    HAL_IWDG_Refresh( &hiwdg);
+    if (is_iwdg_reset)
+    {
+        HAL_IWDG_Refresh(&hiwdg);
+    }
+
     HAL_Delay(300);
   }
   /* USER CODE END 3 */
