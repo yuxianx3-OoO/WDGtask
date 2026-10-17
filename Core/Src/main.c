@@ -19,8 +19,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "iwdg.h"
-#include "stm32f1xx_hal_iwdg.h"
 #include "usart.h"
+#include "wwdg.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -45,6 +45,8 @@ typedef struct {
 #define FLASH_IWDG_ADDR    0x0800FC08
 #define FLASH_WWDG_ADDR    0x0800FC0C
 #define FLASH_MAGIC        0x12345678
+
+#define TEST_MODE 5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -116,7 +118,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
-  
+  /* 看门狗不在这里初始化：IWDG/WWDG 一旦启动就无法停止，
+     而 OLED_Init() 里的软件 I2C 延时 + Flash 擦写耗时较长，
+     会超过看门狗超时时间，导致 MCU 反复复位、屏幕一直不亮。
+     看门狗统一放到下面“OLED 显示完成之后”按 TEST_MODE 再启动。 */
+  /* MX_WWDG_Init(); */
+  /* MX_IWDG_Init(); */
   /* USER CODE BEGIN 2 */
   
  
@@ -158,19 +165,56 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  // MX_WWDG_Init();
+  #if TEST_MODE == 1//模式 1：需要正常喂 IWDG。
 
-  MX_IWDG_Init();
+    MX_IWDG_Init();
+
+  #elif TEST_MODE == 2//模式 2：不喂 IWDG，超时复位。
+
+      if (!is_iwdg_reset)
+      {
+          MX_IWDG_Init();
+      }
+
+  #elif TEST_MODE == 3//模式 3：需要正常喂 WWDG。
+
+      MX_WWDG_Init();
+
+  #elif TEST_MODE == 4//模式 4：启动后立即喂 WWDG，过早复位。
+
+      if (!is_wwdg_reset)
+      {
+          MX_WWDG_Init();
+          HAL_WWDG_Refresh(&hwwdg);
+      }
+
+  #elif TEST_MODE == 5//模式 5：不喂 WWDG，超时复位。
+
+      if (!is_wwdg_reset)
+      {
+          MX_WWDG_Init();
+      }
+
+  #endif
+
   while (1)
   {
     /* USER CODE END WHILE */
-    
-    /* USER CODE BEGIN 3 */
-    if (is_iwdg_reset)
-    {
-        HAL_IWDG_Refresh(&hiwdg);
-    }
 
-    HAL_Delay(300);
+    /* USER CODE BEGIN 3 */
+    #if TEST_MODE == 1
+      HAL_IWDG_Refresh(&hiwdg);
+      HAL_Delay(300);  
+    // IWDG 模式下Tout = (分频系数 × (重装载值 + 1)) / f_LSI，喂狗时间间隔必须小于 1.6 秒，否则会复位
+      HAL_Delay(300);
+    #elif TEST_MODE == 3
+      
+      HAL_Delay(40);
+      HAL_WWDG_Refresh(&hwwdg);
+    #else
+      HAL_Delay(100);
+    #endif       
   }
   /* USER CODE END 3 */
 }
